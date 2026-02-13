@@ -1,0 +1,6 @@
+node_modules/
+.env
+wallets/*.json
+*.log
+sniper_state.json
+sniper_trades.json

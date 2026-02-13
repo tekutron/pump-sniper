@@ -1,0 +1,19 @@
+{
+  "name": "pump-sniper",
+  "version": "1.0.0",
+  "description": "Ultra-fast pump.fun token sniper - buy on launch, sell at +10% or 10s",
+  "type": "module",
+  "main": "sniper.mjs",
+  "scripts": {
+    "start": "node sniper.mjs",
+    "test": "node test-sniper.mjs"
+  },
+  "keywords": ["solana", "pump.fun", "sniper", "trading"],
+  "author": "Dogesy",
+  "license": "MIT",
+  "dependencies": {
+    "@solana/web3.js": "^1.95.8",
+    "@solana/spl-token": "^0.4.9",
+    "bs58": "^6.0.0"
+  }
+}
