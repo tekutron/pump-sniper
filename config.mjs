@@ -23,8 +23,8 @@ export const config = {
   RPC_URL: process.env.HELIUS_RPC_URL || process.env.SOLANA_RPC || 'https://api.mainnet-beta.solana.com',
   RPC_WS_URL: (process.env.HELIUS_RPC_URL || process.env.SOLANA_RPC || '')?.replace('https://', 'wss://').replace('http://', 'ws://') || null,
   
-  // Wallet
-  WALLET_PATH: './wallets/generated_keypair.json',
+  // Wallet (dedicated pump-sniper wallet)
+  WALLET_PATH: './wallets/pump_sniper_wallet.json',
   
   // State files
   STATE_FILE: './sniper_state.json',
