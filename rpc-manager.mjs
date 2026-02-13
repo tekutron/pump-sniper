@@ -8,12 +8,12 @@ import { Connection } from '@solana/web3.js';
 
 export class RPCManager {
   constructor() {
-    // Free Solana RPC endpoints (round-robin)
+    // Reliable Solana RPC endpoints (tested, no 403 errors)
     this.endpoints = [
       process.env.HELIUS_RPC_URL || 'https://mainnet.helius-rpc.com/?api-key=86172fb4-a950-47b4-9641-ac1a0a346492',
       'https://api.mainnet-beta.solana.com',
       'https://rpc.ankr.com/solana',
-      'https://solana-api.projectserum.com',
+      // Removed: projectserum.com (403 errors on some calls)
     ].filter(Boolean); // Remove any null/undefined
     
     this.currentIndex = 0;
@@ -64,9 +64,12 @@ export class RPCManager {
       } catch (err) {
         lastError = err;
         
-        // If rate limited, try next endpoint immediately
-        if (err.message.includes('429') || err.message.includes('rate limit')) {
-          console.log(`   ⚠️  RPC rate limited, rotating to next endpoint...`);
+        // If rate limited or forbidden, try next endpoint immediately
+        if (err.message.includes('429') || 
+            err.message.includes('rate limit') ||
+            err.message.includes('403') ||
+            err.message.includes('Forbidden')) {
+          // Silently rotate to next endpoint
           continue;
         }
         

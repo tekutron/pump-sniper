@@ -142,6 +142,17 @@ class PumpSniper {
     
     console.log(`\n💎 ${config.DRY_RUN ? 'SIMULATING' : 'SNIPING'} ${token.mint.slice(0, 8)}...`);
     
+    // Reserve the position slot IMMEDIATELY to prevent race conditions
+    const placeholderPosition = {
+      mint: token.mint,
+      entryTime: Date.now(),
+      entryPrice: null,
+      buySig: null,
+      amountSol: config.POSITION_SIZE_SOL,
+      tokenAmount: null
+    };
+    this.activePositions.set(token.mint, placeholderPosition);
+    
     let buyResult;
     
     if (config.DRY_RUN) {
@@ -166,33 +177,74 @@ class PumpSniper {
     if (!buyResult.success) {
       this.stats.failed++;
       console.log(`❌ Snipe failed - could not buy`);
+      this.activePositions.delete(token.mint); // Remove placeholder
       this.recordTrade(token, buyResult, null, 'FAILED_BUY');
       return;
     }
     
     this.stats.executed++;
     
-    // Track position
-    const position = {
-      mint: token.mint,
-      entryTime: Date.now(),
-      entryPrice: null, // Will update when we get first price
-      buySig: buyResult.signature,
-      amountSol: config.POSITION_SIZE_SOL,
-      tokenAmount: null // Will update after buy confirms
-    };
-    
-    this.activePositions.set(token.mint, position);
+    // Update position with buy signature
+    const position = this.activePositions.get(token.mint);
+    position.buySig = buyResult.signature;
     
     console.log(`✅ Position opened`);
     console.log(`   Entry: ${new Date(position.entryTime).toLocaleTimeString()}`);
     
-    // Wait for buy to confirm before monitoring
-    console.log(`   ⏳ Waiting 2s for buy confirmation...`);
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Wait for buy transaction to ACTUALLY confirm on-chain
+    if (!buyResult.signature) {
+      console.log(`   ❌ No transaction signature - cannot confirm`);
+      this.activePositions.delete(token.mint);
+      this.recordTrade(token, position, null, 'NO_SIGNATURE');
+      return;
+    }
+    
+    console.log(`   ⏳ Waiting for buy confirmation...`);
+    const confirmed = await this.waitForConfirmation(buyResult.signature);
+    
+    if (!confirmed) {
+      console.log(`   ⚠️  Buy confirmation timeout - exiting position`);
+      this.activePositions.delete(token.mint);
+      this.recordTrade(token, position, null, 'CONFIRMATION_TIMEOUT');
+      return;
+    }
+    
+    console.log(`   ✅ Buy confirmed on-chain!`);
     
     // Step 2: Monitor for exit
     await this.monitorPosition(token.mint, position);
+  }
+
+  async waitForConfirmation(signature, maxAttempts = 30) {
+    // Poll for confirmation with 1-second intervals
+    // 30 attempts = 30 seconds max wait
+    console.log(`   🔍 Polling for confirmation: ${signature.slice(0, 8)}...`);
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const status = await this.executor.connection.getSignatureStatus(signature);
+        
+        if (status?.value?.confirmationStatus === 'confirmed' || 
+            status?.value?.confirmationStatus === 'finalized') {
+          console.log(`   ✅ Confirmed after ${i + 1} attempts (~${i + 1}s)`);
+          return true;
+        }
+        
+        if (status?.value?.err) {
+          console.log(`   ❌ Transaction failed: ${JSON.stringify(status.value.err)}`);
+          return false;
+        }
+        
+      } catch (err) {
+        console.log(`   ⚠️  Error checking status (attempt ${i + 1}): ${err.message}`);
+      }
+      
+      // Wait 1 second before next check
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    console.log(`   ❌ Confirmation timeout after ${maxAttempts}s`);
+    return false;
   }
 
   async monitorPosition(mint, position) {
@@ -243,7 +295,11 @@ class PumpSniper {
       }
       
       if (!priceData) {
-        console.log(`   [${(elapsed/1000).toFixed(1)}s] ⚠️  No price data`);
+        // No price data available - this is expected since we haven't implemented
+        // bonding curve parsing yet. Just show elapsed time and wait for timeout.
+        if (elapsed % 5000 < config.PRICE_POLL_MS) { // Log every 5 seconds
+          console.log(`   [${(elapsed/1000).toFixed(1)}s] ⏳ Waiting for timeout (no price data yet)...`);
+        }
         return; // Skip this iteration but keep monitoring
       }
       

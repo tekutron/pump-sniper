@@ -343,17 +343,13 @@ export class PumpFunSDK {
         return null;
       }
 
-      // Parse bonding curve state (simplified - actual format may vary)
-      // Real implementation would deserialize the account data properly
-      const data = accountInfo.data;
+      // Parse bonding curve state
+      // TODO: Properly deserialize bonding curve account data
+      // For now, return null to indicate price unavailable
+      // Bot will rely on timeout exits instead of TP monitoring
       
-      // Placeholder: return a calculated price based on bonding curve state
-      // You'd need to reverse-engineer the exact data layout
-      
-      return {
-        price: 0.0001, // Placeholder
-        timestamp: Date.now()
-      };
+      // Placeholder implementation - needs proper deserialization
+      return null;
 
     } catch (err) {
       // Suppress rate limit error spam (already handled by RPC manager)
