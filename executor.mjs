@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 /**
  * executor.mjs - Buy/Sell Execution
- * Fast execution with high priority fees
+ * Fast execution with high priority fees via Pump.fun bonding curve
  */
 
-import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import fs from 'node:fs';
 import config from './config.mjs';
+import { PumpFunSDK } from './pumpfun-sdk.mjs';
 
 export class Executor {
   constructor() {
     this.connection = new Connection(config.RPC_URL, 'confirmed');
     this.keypair = this.loadWallet();
+    this.pumpFunSDK = new PumpFunSDK(this.connection, this.keypair);
   }
 
   loadWallet() {
@@ -25,35 +27,29 @@ export class Executor {
     return balance / LAMPORTS_PER_SOL;
   }
 
+  /**
+   * Buy token via Pump.fun bonding curve
+   */
   async buyToken(tokenMint) {
-    console.log(`\n💰 Executing BUY for ${tokenMint.slice(0, 8)}...`);
+    console.log(`\n💰 Executing PUMP.FUN BUY for ${tokenMint.slice(0, 8)}...`);
     
     try {
-      const startTime = Date.now();
+      const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
+      const slippageBps = 1000; // 10% slippage (pump.fun tokens are volatile)
       
-      // For now, use a swap aggregator (Jupiter or Raydium)
-      // In production, you'd want to interact directly with pump.fun bonding curve
+      const result = await this.pumpFunSDK.buyToken(
+        tokenMint,
+        config.POSITION_SIZE_SOL,
+        slippageBps,
+        priorityFeeLamports
+      );
       
-      // Simplified buy via Raydium (placeholder - need actual swap logic)
-      console.log(`   Position: ${config.POSITION_SIZE_SOL} SOL`);
-      console.log(`   Priority fee: ${config.PRIORITY_FEE_SOL} SOL`);
+      if (result.success) {
+        console.log(`✅ Buy executed in ${result.executionTimeMs}ms`);
+        console.log(`   Signature: ${result.signature}`);
+      }
       
-      // TODO: Implement actual swap
-      // For now, simulate buy
-      const signature = await this.simulateBuy(tokenMint);
-      
-      const elapsed = Date.now() - startTime;
-      console.log(`✅ Buy executed in ${elapsed}ms`);
-      console.log(`   Signature: ${signature}`);
-      
-      return {
-        success: true,
-        signature: signature,
-        mint: tokenMint,
-        amountSol: config.POSITION_SIZE_SOL,
-        timestamp: Date.now(),
-        executionTimeMs: elapsed
-      };
+      return result;
       
     } catch (err) {
       console.error(`❌ Buy failed: ${err.message}`);
@@ -65,29 +61,33 @@ export class Executor {
     }
   }
 
+  /**
+   * Sell token via Pump.fun bonding curve
+   */
   async sellToken(tokenMint, tokenAmount) {
-    console.log(`\n💸 Executing SELL for ${tokenMint.slice(0, 8)}...`);
+    console.log(`\n💸 Executing PUMP.FUN SELL for ${tokenMint.slice(0, 8)}...`);
     
     try {
-      const startTime = Date.now();
+      const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
       
-      console.log(`   Amount: ${tokenAmount} tokens`);
-      console.log(`   Priority fee: ${config.PRIORITY_FEE_SOL} SOL`);
+      // If tokenAmount is null/undefined, sell entire balance
+      if (!tokenAmount) {
+        tokenAmount = await this.getTokenBalance(tokenMint);
+        console.log(`   📊 Auto-detected balance: ${tokenAmount} tokens`);
+      }
       
-      // TODO: Implement actual swap
-      const signature = await this.simulateSell(tokenMint, tokenAmount);
+      const result = await this.pumpFunSDK.sellToken(
+        tokenMint,
+        tokenAmount,
+        priorityFeeLamports
+      );
       
-      const elapsed = Date.now() - startTime;
-      console.log(`✅ Sell executed in ${elapsed}ms`);
-      console.log(`   Signature: ${signature}`);
+      if (result.success) {
+        console.log(`✅ Sell executed in ${result.executionTimeMs}ms`);
+        console.log(`   Signature: ${result.signature}`);
+      }
       
-      return {
-        success: true,
-        signature: signature,
-        mint: tokenMint,
-        timestamp: Date.now(),
-        executionTimeMs: elapsed
-      };
+      return result;
       
     } catch (err) {
       console.error(`❌ Sell failed: ${err.message}`);
@@ -99,20 +99,22 @@ export class Executor {
     }
   }
 
+  /**
+   * Get token price from Pump.fun bonding curve
+   */
   async getTokenPrice(tokenMint) {
     try {
-      // TODO: Implement price fetching
-      // For now, return mock price
-      return {
-        price: 0.0001 + Math.random() * 0.0002,
-        timestamp: Date.now()
-      };
+      const priceData = await this.pumpFunSDK.getBondingCurvePrice(tokenMint);
+      return priceData;
     } catch (err) {
       console.error('Error fetching price:', err.message);
       return null;
     }
   }
 
+  /**
+   * Get token balance for wallet
+   */
   async getTokenBalance(tokenMint) {
     try {
       const mintPubkey = new PublicKey(tokenMint);
@@ -129,20 +131,6 @@ export class Executor {
     } catch (err) {
       return 0;
     }
-  }
-
-  // Simulation methods (replace with real swap logic)
-  async simulateBuy(tokenMint) {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
-    
-    // Generate fake signature
-    return 'SIM' + Math.random().toString(36).substring(2, 15);
-  }
-
-  async simulateSell(tokenMint, amount) {
-    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
-    return 'SIM' + Math.random().toString(36).substring(2, 15);
   }
 }
 

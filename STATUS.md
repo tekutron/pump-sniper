@@ -47,33 +47,47 @@
 ✅ Monitor OK (Connection established)
 ```
 
-## 🚧 Phase 2: Swap Integration (TODO)
+## ✅ Phase 2: Pump.fun Bonding Curve Integration (COMPLETE)
 
-### What's Missing
+### Implementation: Direct Pump.fun Bonding Curve
 
-The bot currently **simulates** buy/sell transactions. Need to implement real swaps:
+**Chosen Strategy:** Pump.fun bonding curve (fastest for sniping)
 
-#### Option 1: Jupiter Aggregator
-- **Pro:** Best prices, handles routing automatically
-- **Con:** Additional API dependency
-- **Library:** `@jup-ag/core` or Jupiter API
+#### Why Pump.fun Direct?
+- ✅ **Fastest execution** - Direct program interaction
+- ✅ **Native to pump.fun launches** - Tokens exist here first
+- ✅ **Lowest latency** - No aggregator routing
+- ✅ **High priority fees** - Configurable compute budget
 
-#### Option 2: Raydium Direct
-- **Pro:** Direct DEX interaction, no middleman
-- **Con:** Need to find liquidity pools
-- **Library:** `@raydium-io/raydium-sdk`
+#### New Files Added
 
-#### Option 3: Pump.fun Bonding Curve
-- **Pro:** Fastest (native pump.fun swap)
-- **Con:** Need to reverse-engineer pump.fun contract
-- **Best for:** Ultimate speed
+1. **pumpfun-sdk.mjs** ✅
+   - Direct bonding curve buy/sell instructions
+   - PDA derivation for bonding curve accounts
+   - Priority fee management
+   - Slippage protection
 
-### Implementation Plan
+2. **executor.mjs** (updated) ✅
+   - Integrated PumpFunSDK
+   - Real transaction execution
+   - Balance queries
+   - Price fetching from bonding curve
 
-1. Add Jupiter aggregator first (easiest)
-2. Test on devnet
-3. Optimize for speed
-4. Consider pump.fun direct later
+### Transaction Flow
+
+**Buy Flow:**
+1. Derive bonding curve PDA
+2. Create/check user token account (ATA)
+3. Build buy instruction with compute budget
+4. Send with skipPreflight for speed
+5. Return signature immediately (don't wait for confirmation)
+
+**Sell Flow:**
+1. Query token balance
+2. Derive bonding curve PDA
+3. Build sell instruction
+4. Send with high priority fee
+5. Return signature
 
 ## 🎯 Current State
 
@@ -83,32 +97,50 @@ The bot currently **simulates** buy/sell transactions. Need to implement real sw
 - ✅ Exit logic (TP/timeout)
 - ✅ Stats tracking
 - ✅ Graceful shutdown
+- ✅ **REAL pump.fun bonding curve buys**
+- ✅ **REAL pump.fun bonding curve sells**
+- ✅ **Priority fee management**
 
-**What's Simulated:**
-- ⚠️ Buy transactions (returns fake signature)
-- ⚠️ Sell transactions (returns fake signature)
-- ⚠️ Price fetching (returns random prices)
+**What's Ready:**
+- ✅ Buy transactions (pump.fun bonding curve)
+- ✅ Sell transactions (pump.fun bonding curve)
+- ⚠️ Price fetching (needs bonding curve state parsing)
 
-**Risk:** Cannot run live yet - swaps are simulated!
+**⚠️ CAUTION:** Bot now executes REAL transactions with REAL SOL!
 
 ## 📊 Next Session Goals
 
-1. **Add Jupiter integration** for real swaps
-2. **Test on devnet** with test SOL
-3. **Measure speed** (detection → buy execution time)
-4. **Paper trade** for 1 hour to validate logic
-5. **Deploy live** if tests pass
+1. ✅ **Pump.fun integration** - DONE!
+2. **Test transaction building** - Verify instruction format
+3. **Implement bonding curve price parsing** - Get real prices
+4. **Dry-run test** - Monitor launches without buying
+5. **Small live test** - 1-2 snipes with 0.01 SOL
+6. **Full deployment** - If tests successful
 
-## 🎮 How to Test (Safe Mode)
+## 🎮 Testing Strategy
 
+### Phase 1: Dry Run (RECOMMENDED FIRST)
 ```bash
-# Currently runs in simulation mode
+# Monitor launches but don't execute buys
 cd /home/j/.openclaw/pump-sniper
-MAIN_WALLET=1 node sniper.mjs
-
-# Will detect launches but won't execute real swaps
-# Logs show simulated buy/sell with fake P&L
+# Temporarily comment out buy execution in sniper.mjs
+node sniper.mjs
 ```
+
+### Phase 2: Small Live Test
+```bash
+# Reduce position size in config.mjs to 0.01 SOL
+# Run for 10 minutes, max 2 snipes
+MAIN_WALLET=1 node sniper.mjs
+```
+
+### Phase 3: Full Live
+```bash
+# Restore position size to 0.05 SOL
+MAIN_WALLET=1 node sniper.mjs
+```
+
+**⚠️ WARNING:** Real transactions = real money. Test carefully!
 
 ## 📁 Files Summary
 
