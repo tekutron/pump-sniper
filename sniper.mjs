@@ -28,6 +28,11 @@ class PumpSniper {
 
   async start() {
     console.log('🎯 Pump Sniper Starting...\n');
+    
+    if (config.DRY_RUN) {
+      console.log('🧪 DRY-RUN MODE: Monitoring only, no real trades\n');
+    }
+    
     console.log('Strategy:');
     console.log(`  Position: ${config.POSITION_SIZE_SOL} SOL`);
     console.log(`  Take Profit: +${config.TAKE_PROFIT_PCT}%`);
@@ -52,6 +57,66 @@ class PumpSniper {
     
     // Save state periodically
     setInterval(() => this.saveState(), 5000);
+    
+    // Auto-stop for dry-run tests (if DRY_RUN_MINUTES is set)
+    if (config.DRY_RUN && process.env.DRY_RUN_MINUTES) {
+      const minutes = parseInt(process.env.DRY_RUN_MINUTES);
+      console.log(`⏱️  Auto-stop scheduled in ${minutes} minute(s)\n`);
+      
+      setTimeout(async () => {
+        console.log(`\n⏱️  ${minutes} minute test complete!\n`);
+        await this.printReport();
+        await this.stop();
+        process.exit(0);
+      }, minutes * 60 * 1000);
+    }
+  }
+  
+  async printReport() {
+    console.log('\n' + '='.repeat(60));
+    console.log('📊 SIMULATION REPORT');
+    console.log('='.repeat(60));
+    console.log(`\n📈 Session Stats:`);
+    console.log(`   Total Detected: ${this.stats.detected}`);
+    console.log(`   Total Executed: ${this.stats.executed}`);
+    console.log(`   Wins (TP hit): ${this.stats.wins}`);
+    console.log(`   Timeouts: ${this.stats.timeouts}`);
+    console.log(`   Failed: ${this.stats.failed}`);
+    
+    const winRate = this.stats.executed > 0 ? (this.stats.wins / this.stats.executed * 100) : 0;
+    console.log(`   Win Rate: ${winRate.toFixed(1)}%`);
+    
+    // Calculate estimated P&L (rough approximation)
+    const avgWinPnl = 10; // TP at +10%
+    const avgLossPnl = -2; // Average timeout loss
+    const totalWinPnl = this.stats.wins * avgWinPnl;
+    const totalLossPnl = this.stats.timeouts * avgLossPnl;
+    const netPnl = totalWinPnl + totalLossPnl;
+    
+    console.log(`\n💰 Estimated P&L:`);
+    console.log(`   Win P&L: +${totalWinPnl.toFixed(1)}%`);
+    console.log(`   Loss P&L: ${totalLossPnl.toFixed(1)}%`);
+    console.log(`   Net P&L: ${netPnl > 0 ? '+' : ''}${netPnl.toFixed(1)}%`);
+    
+    if (this.stats.executed > 0) {
+      const avgPnl = netPnl / this.stats.executed;
+      console.log(`   Avg P&L per trade: ${avgPnl > 0 ? '+' : ''}${avgPnl.toFixed(2)}%`);
+    }
+    
+    console.log(`\n📝 Recent Trades:`);
+    const recentTrades = this.trades.slice(-5);
+    if (recentTrades.length === 0) {
+      console.log(`   No trades recorded`);
+    } else {
+      recentTrades.forEach((trade, idx) => {
+        const pnl = trade.exit.pnlPct;
+        const reason = trade.exit.reason;
+        const holdTime = (trade.exit.holdTimeMs / 1000).toFixed(1);
+        console.log(`   ${idx + 1}. ${trade.mint.slice(0, 8)}... | ${pnl > 0 ? '+' : ''}${pnl.toFixed(2)}% | ${reason} | ${holdTime}s`);
+      });
+    }
+    
+    console.log('\n' + '='.repeat(60));
   }
 
   async handleNewToken(token) {
@@ -75,10 +140,28 @@ class PumpSniper {
   async snipe(token) {
     const snipeStart = Date.now();
     
-    console.log(`\n💎 SNIPING ${token.mint.slice(0, 8)}...`);
+    console.log(`\n💎 ${config.DRY_RUN ? 'SIMULATING' : 'SNIPING'} ${token.mint.slice(0, 8)}...`);
     
-    // Step 1: Buy
-    const buyResult = await this.executor.buyToken(token.mint);
+    let buyResult;
+    
+    if (config.DRY_RUN) {
+      // Dry-run mode: simulate buy with mock data
+      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200)); // Simulate network delay
+      console.log(`   🧪 DRY-RUN: Simulated buy ${config.POSITION_SIZE_SOL} SOL`);
+      console.log(`   ⏱️  Simulated execution: ${Date.now() - snipeStart}ms`);
+      
+      buyResult = {
+        success: true,
+        signature: 'SIM_' + Math.random().toString(36).substring(2, 15),
+        mint: token.mint,
+        amountSol: config.POSITION_SIZE_SOL,
+        timestamp: Date.now(),
+        executionTimeMs: Date.now() - snipeStart
+      };
+    } else {
+      // Step 1: Buy (live mode only)
+      buyResult = await this.executor.buyToken(token.mint);
+    }
     
     if (!buyResult.success) {
       this.stats.failed++;
@@ -104,6 +187,10 @@ class PumpSniper {
     console.log(`✅ Position opened`);
     console.log(`   Entry: ${new Date(position.entryTime).toLocaleTimeString()}`);
     
+    // Wait for buy to confirm before monitoring
+    console.log(`   ⏳ Waiting 2s for buy confirmation...`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     // Step 2: Monitor for exit
     await this.monitorPosition(token.mint, position);
   }
@@ -119,12 +206,45 @@ class PumpSniper {
       const elapsed = Date.now() - startTime;
       priceChecks++;
       
-      // Get current price
-      const priceData = await this.executor.getTokenPrice(mint);
+      // Get current price (or simulate in dry-run)
+      let priceData;
+      
+      if (config.DRY_RUN) {
+        // Simulate realistic price movement for dry-run
+        if (!entryPrice) {
+          entryPrice = 0.0001; // Starting price
+        }
+        
+        // Simulate price: 30% chance of pumping, 70% chance of dumping/flat
+        const rand = Math.random();
+        let priceChange;
+        
+        if (rand < 0.3) {
+          // Pumping (0% to +20%)
+          priceChange = Math.random() * 0.20;
+        } else {
+          // Dumping or flat (-10% to +5%)
+          priceChange = (Math.random() * 0.15) - 0.10;
+        }
+        
+        const currentPrice = entryPrice * (1 + priceChange);
+        priceData = { price: currentPrice, timestamp: Date.now() };
+      } else {
+        priceData = await this.executor.getTokenPrice(mint);
+      }
+      
+      // ALWAYS check timeout first (even if price data fails!)
+      if (elapsed >= config.MAX_HOLD_TIME_MS) {
+        clearInterval(pollInterval);
+        console.log(`\n⏱️  TIME LIMIT REACHED (${config.MAX_HOLD_TIME_MS/1000}s)`);
+        await this.exitPosition(mint, position, 'TIME', 0);
+        this.stats.timeouts++;
+        return;
+      }
       
       if (!priceData) {
         console.log(`   [${(elapsed/1000).toFixed(1)}s] ⚠️  No price data`);
-        return;
+        return; // Skip this iteration but keep monitoring
       }
       
       const currentPrice = priceData.price;
@@ -140,21 +260,12 @@ class PumpSniper {
       
       console.log(`   [${(elapsed/1000).toFixed(1)}s] Price: $${currentPrice.toFixed(8)} | P&L: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%`);
       
-      // Exit condition 1: Take profit
+      // Exit condition: Take profit
       if (pnlPct >= config.TAKE_PROFIT_PCT) {
         clearInterval(pollInterval);
         console.log(`\n🎉 TAKE PROFIT HIT! +${pnlPct.toFixed(2)}%`);
         await this.exitPosition(mint, position, 'TP', pnlPct);
         this.stats.wins++;
-        return;
-      }
-      
-      // Exit condition 2: Time limit
-      if (elapsed >= config.MAX_HOLD_TIME_MS) {
-        clearInterval(pollInterval);
-        console.log(`\n⏱️  TIME LIMIT REACHED (${config.MAX_HOLD_TIME_MS/1000}s)`);
-        await this.exitPosition(mint, position, 'TIME', pnlPct);
-        this.stats.timeouts++;
         return;
       }
       
@@ -164,18 +275,36 @@ class PumpSniper {
   async exitPosition(mint, position, reason, pnlPct) {
     console.log(`\n💸 Exiting position...`);
     
-    // Get token balance to sell
-    const tokenAmount = await this.executor.getTokenBalance(mint);
+    let tokenAmount, sellResult;
     
-    if (tokenAmount <= 0) {
-      console.log(`⚠️  No tokens to sell (balance: ${tokenAmount})`);
-      this.activePositions.delete(mint);
-      this.recordTrade({ mint }, position, null, 'NO_TOKENS');
-      return;
+    if (config.DRY_RUN) {
+      // Simulate sell in dry-run
+      tokenAmount = 1000000; // Mock token amount
+      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200)); // Simulate network delay
+      
+      sellResult = {
+        success: true,
+        signature: 'SIM_' + Math.random().toString(36).substring(2, 15),
+        mint: mint,
+        timestamp: Date.now(),
+        executionTimeMs: 150
+      };
+      
+      console.log(`   🧪 DRY-RUN: Simulated sell`);
+    } else {
+      // Get token balance to sell
+      tokenAmount = await this.executor.getTokenBalance(mint);
+      
+      if (tokenAmount <= 0) {
+        console.log(`⚠️  No tokens to sell (balance: ${tokenAmount})`);
+        this.activePositions.delete(mint);
+        this.recordTrade({ mint }, position, null, 'NO_TOKENS');
+        return;
+      }
+      
+      // Execute sell
+      sellResult = await this.executor.sellToken(mint, tokenAmount);
     }
-    
-    // Execute sell
-    const sellResult = await this.executor.sellToken(mint, tokenAmount);
     
     if (!sellResult.success) {
       console.log(`❌ Sell failed: ${sellResult.error}`);

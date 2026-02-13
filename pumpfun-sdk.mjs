@@ -130,7 +130,8 @@ export class PumpFunSDK {
 
       // Build buy instruction
       const lamportsToSpend = Math.floor(solAmount * LAMPORTS_PER_SOL);
-      const maxTokenAmount = BigInt(0xFFFFFFFFFFFFFFFF); // Max tokens (will be limited by SOL amount)
+      // Use a reasonable max token amount instead of u64 max to avoid overflow
+      const maxTokenAmount = BigInt(1_000_000_000_000_000); // 1 quadrillion tokens (reasonable upper bound)
 
       // Instruction data: [discriminator(8), lamports(8), max_tokens(8)]
       const instructionData = Buffer.concat([
@@ -327,7 +328,10 @@ export class PumpFunSDK {
       };
 
     } catch (err) {
-      console.error('Error fetching bonding curve price:', err.message);
+      // Suppress rate limit error spam (already handled by connection retry logic)
+      if (!err.message.includes('429') && !err.message.includes('rate limit')) {
+        console.error('Error fetching bonding curve price:', err.message);
+      }
       return null;
     }
   }
