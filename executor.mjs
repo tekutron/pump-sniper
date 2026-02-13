@@ -4,17 +4,19 @@
  * Fast execution with high priority fees via Pump.fun bonding curve
  */
 
-import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import fs from 'node:fs';
 import config from './config.mjs';
 import { PumpFunSDK } from './pumpfun-sdk.mjs';
+import { RPCManager } from './rpc-manager.mjs';
 
 export class Executor {
   constructor() {
-    this.connection = new Connection(config.RPC_URL, 'confirmed');
+    this.rpcManager = new RPCManager();
+    this.connection = this.rpcManager.getPrimaryConnection(); // Primary for balance checks
     this.keypair = this.loadWallet();
-    this.pumpFunSDK = new PumpFunSDK(this.connection, this.keypair);
+    this.pumpFunSDK = new PumpFunSDK(this.rpcManager, this.keypair);
   }
 
   loadWallet() {

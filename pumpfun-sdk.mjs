@@ -33,9 +33,26 @@ const SELL_DISCRIMINATOR = Buffer.from([0x33, 0xe6, 0x85, 0xa4, 0x01, 0x7f, 0x83
  * PumpFunSDK - Direct bonding curve interaction
  */
 export class PumpFunSDK {
-  constructor(connection, wallet) {
-    this.connection = connection;
+  constructor(rpcManagerOrConnection, wallet) {
+    // Support both RPCManager and raw Connection for backwards compatibility
+    if (rpcManagerOrConnection.getConnection) {
+      this.rpcManager = rpcManagerOrConnection;
+      this.connection = this.rpcManager.getPrimaryConnection();
+    } else {
+      this.connection = rpcManagerOrConnection;
+      this.rpcManager = null;
+    }
     this.wallet = wallet;
+  }
+
+  /**
+   * Get a connection (rotates if using RPC manager)
+   */
+  _getConnection() {
+    if (this.rpcManager) {
+      return this.rpcManager.getConnection().connection;
+    }
+    return this.connection;
   }
 
   /**
@@ -159,11 +176,12 @@ export class PumpFunSDK {
 
       transaction.add(buyInstruction);
 
-      // Send transaction
+      // Send transaction (use primary connection for consistency)
       const startTime = Date.now();
       console.log(`   📤 Sending transaction...`);
       
-      const signature = await this.connection.sendTransaction(transaction, [this.wallet], {
+      const conn = this.rpcManager ? this.rpcManager.getPrimaryConnection() : this.connection;
+      const signature = await conn.sendTransaction(transaction, [this.wallet], {
         skipPreflight: true, // Skip preflight for maximum speed
         maxRetries: 3
       });
@@ -270,11 +288,12 @@ export class PumpFunSDK {
 
       transaction.add(sellInstruction);
 
-      // Send transaction
+      // Send transaction (use primary connection for consistency)
       const startTime = Date.now();
       console.log(`   📤 Sending transaction...`);
 
-      const signature = await this.connection.sendTransaction(transaction, [this.wallet], {
+      const conn = this.rpcManager ? this.rpcManager.getPrimaryConnection() : this.connection;
+      const signature = await conn.sendTransaction(transaction, [this.wallet], {
         skipPreflight: true,
         maxRetries: 3
       });
@@ -303,14 +322,23 @@ export class PumpFunSDK {
 
   /**
    * Get bonding curve price (price per token in SOL)
+   * Uses RPC rotation with automatic retry on rate limits
    */
   async getBondingCurvePrice(mintAddress) {
     try {
       const mint = new PublicKey(mintAddress);
       const bondingCurve = await this.getBondingCurvePDA(mint);
       
-      // Fetch bonding curve account data
-      const accountInfo = await this.connection.getAccountInfo(bondingCurve);
+      // Use RPC rotation if available
+      let accountInfo;
+      if (this.rpcManager) {
+        accountInfo = await this.rpcManager.executeWithRetry(async (connection) => {
+          return await connection.getAccountInfo(bondingCurve);
+        });
+      } else {
+        accountInfo = await this.connection.getAccountInfo(bondingCurve);
+      }
+      
       if (!accountInfo) {
         return null;
       }
@@ -328,7 +356,7 @@ export class PumpFunSDK {
       };
 
     } catch (err) {
-      // Suppress rate limit error spam (already handled by connection retry logic)
+      // Suppress rate limit error spam (already handled by RPC manager)
       if (!err.message.includes('429') && !err.message.includes('rate limit')) {
         console.error('Error fetching bonding curve price:', err.message);
       }
