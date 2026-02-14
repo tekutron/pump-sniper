@@ -36,9 +36,9 @@ export const config = {
   
   // Safety Filters (NEW)
   ENABLE_SAFETY_FILTERS: true,           // Enable pre-buy safety checks
-  MIN_SAFETY_SCORE: 60,                  // Minimum composite safety score (0-100)
-  MIN_RUGCHECK_SCORE: 50,                // Minimum RugCheck score
-  MIN_LIQUIDITY_USD: 1000,               // Minimum liquidity in USD
+  MIN_SAFETY_SCORE: 50,                  // Minimum composite safety score (0-100) [lowered from 60]
+  MIN_RUGCHECK_SCORE: 40,                // Minimum RugCheck score [lowered from 50]
+  MIN_LIQUIDITY_USD: 900,                // Minimum liquidity in USD [lowered from 1000]
   REQUIRE_SOCIALS: false,                // Require social presence (twitter/website)
   
   // Dry-run mode (monitor only, no buys)
