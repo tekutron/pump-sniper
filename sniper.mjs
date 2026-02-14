@@ -7,12 +7,14 @@
 import fs from 'node:fs';
 import PumpMonitor from './monitor.mjs';
 import Executor from './executor.mjs';
+import SafetyChecker from './filters/safety-checker.mjs';
 import config from './config.mjs';
 
 class PumpSniper {
   constructor() {
     this.monitor = null;
     this.executor = null;
+    this.safetyChecker = null;
     this.activePositions = new Map();
     this.trades = [];
     this.isRunning = false;
@@ -22,7 +24,8 @@ class PumpSniper {
       executed: 0,
       wins: 0,
       timeouts: 0,
-      failed: 0
+      failed: 0,
+      safetyRejected: 0  // NEW: Track safety filter rejections
     };
   }
 
@@ -46,6 +49,17 @@ class PumpSniper {
     
     if (balance < config.MIN_BALANCE_SOL) {
       throw new Error(`Insufficient balance (need ${config.MIN_BALANCE_SOL} SOL minimum)`);
+    }
+    
+    // Initialize safety checker
+    if (config.ENABLE_SAFETY_FILTERS) {
+      this.safetyChecker = new SafetyChecker(this.executor.connection, config);
+      console.log(`🛡️  Safety Filters: ENABLED`);
+      console.log(`   Min Score: ${config.MIN_SAFETY_SCORE}`);
+      console.log(`   Min Liquidity: $${config.MIN_LIQUIDITY_USD}`);
+      console.log(`   Require Socials: ${config.REQUIRE_SOCIALS}\n`);
+    } else {
+      console.log(`⚠️  Safety Filters: DISABLED (not recommended!)\n`);
     }
     
     // Start monitor
@@ -78,6 +92,7 @@ class PumpSniper {
     console.log('='.repeat(60));
     console.log(`\n📈 Session Stats:`);
     console.log(`   Total Detected: ${this.stats.detected}`);
+    console.log(`   Safety Rejected: ${this.stats.safetyRejected} (${((this.stats.safetyRejected / this.stats.detected * 100) || 0).toFixed(1)}%)`);
     console.log(`   Total Executed: ${this.stats.executed}`);
     console.log(`   Wins (TP hit): ${this.stats.wins}`);
     console.log(`   Timeouts: ${this.stats.timeouts}`);
@@ -131,6 +146,23 @@ class PumpSniper {
     if (this.activePositions.size >= config.MAX_CONCURRENT_SNIPES) {
       console.log(`⏸️  Skipping - already have ${this.activePositions.size} active position(s)`);
       return;
+    }
+    
+    // Safety check (NEW)
+    if (config.ENABLE_SAFETY_FILTERS && this.safetyChecker) {
+      const safetyResult = await this.safetyChecker.checkToken(token.mint);
+      
+      if (!safetyResult.passed) {
+        this.stats.safetyRejected++;
+        console.log(`🛡️  SAFETY REJECTED: ${safetyResult.rejectionReason}`);
+        console.log(`   Score: ${safetyResult.score}`);
+        
+        // Log rejection to trades file for analysis
+        this.recordTrade(token, null, null, 'SAFETY_REJECTED', 0, 0, safetyResult);
+        return;
+      }
+      
+      console.log(`✅ Safety check passed (score: ${safetyResult.score})`);
     }
     
     // Execute snipe
@@ -386,6 +418,7 @@ class PumpSniper {
     
     console.log(`\n📊 Session Stats:`);
     console.log(`   Detected: ${this.stats.detected}`);
+    console.log(`   Safety Rejected: ${this.stats.safetyRejected}`);
     console.log(`   Executed: ${this.stats.executed}`);
     console.log(`   Wins (TP): ${this.stats.wins}`);
     console.log(`   Timeouts: ${this.stats.timeouts}`);
@@ -395,7 +428,7 @@ class PumpSniper {
     console.log(`   Win Rate: ${winRate.toFixed(1)}%\n`);
   }
 
-  recordTrade(token, buyData, sellData, exitReason, pnlPct = 0, holdTimeMs = 0) {
+  recordTrade(token, buyData, sellData, exitReason, pnlPct = 0, holdTimeMs = 0, safetyResult = null) {
     const trade = {
       mint: token.mint,
       timestamp: new Date().toISOString(),
@@ -411,6 +444,16 @@ class PumpSniper {
         holdTimeMs: holdTimeMs
       }
     };
+    
+    // Add safety check results if available
+    if (safetyResult) {
+      trade.safetyCheck = {
+        passed: safetyResult.passed,
+        score: safetyResult.score,
+        rejectionReason: safetyResult.rejectionReason,
+        checks: safetyResult.checks
+      };
+    }
     
     this.trades.push(trade);
     this.saveTrades();

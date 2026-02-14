@@ -34,6 +34,13 @@ export const config = {
   MAX_CONCURRENT_SNIPES: 1,  // One at a time for now
   MIN_BALANCE_SOL: 0.1,      // Keep reserve
   
+  // Safety Filters (NEW)
+  ENABLE_SAFETY_FILTERS: true,           // Enable pre-buy safety checks
+  MIN_SAFETY_SCORE: 60,                  // Minimum composite safety score (0-100)
+  MIN_RUGCHECK_SCORE: 50,                // Minimum RugCheck score
+  MIN_LIQUIDITY_USD: 1000,               // Minimum liquidity in USD
+  REQUIRE_SOCIALS: false,                // Require social presence (twitter/website)
+  
   // Dry-run mode (monitor only, no buys)
   DRY_RUN: process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1',
 };
