@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * executor.mjs - Buy/Sell Execution
- * Fast execution via Jupiter Aggregator (reliable swap routing)
+ * Fast execution via Jupiter Ultra (supports pump.fun bonding curve)
  */
 
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
