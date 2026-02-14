@@ -129,18 +129,18 @@ export class PumpFunSDK {
         })
       );
 
-      // Check if user token account exists
-      const accountInfo = await this.connection.getAccountInfo(userTokenAccount);
+      // Check if user token account exists and create if needed
+      const accountInfo = await this._getConnection().getAccountInfo(userTokenAccount);
       if (!accountInfo) {
         console.log(`   📝 Creating associated token account...`);
+        // Use simpler version without explicit program IDs
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            this.wallet.publicKey,
-            userTokenAccount,
-            this.wallet.publicKey,
-            mint,
-            TOKEN_PROGRAM_ID,
-            ASSOCIATED_TOKEN_PROGRAM_ID
+            this.wallet.publicKey,  // payer
+            userTokenAccount,       // associatedToken
+            this.wallet.publicKey,  // owner
+            mint                    // mint
+            // Let it use default TOKEN_PROGRAM_ID and ASSOCIATED_TOKEN_PROGRAM_ID
           )
         );
       }
