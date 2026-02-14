@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * executor.mjs - Buy/Sell Execution
- * Fast execution via Jupiter Ultra (supports pump.fun bonding curve)
+ * Fast execution via PumpPortal API (native pump.fun bonding curve support)
  */
 
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import fs from 'node:fs';
 import config from './config.mjs';
-import { JupiterSDK } from './jupiter-sdk.mjs';
+import { PumpPortalSDK } from './pumpportal-sdk.mjs';
 import { RPCManager } from './rpc-manager.mjs';
 
 export class Executor {
@@ -16,7 +16,7 @@ export class Executor {
     this.rpcManager = new RPCManager();
     this.connection = this.rpcManager.getPrimaryConnection(); // Primary for balance checks
     this.keypair = this.loadWallet();
-    this.jupiterSDK = new JupiterSDK(this.rpcManager, this.keypair);
+    this.pumpPortalSDK = new PumpPortalSDK(this.rpcManager, this.keypair);
   }
 
   loadWallet() {
@@ -30,16 +30,16 @@ export class Executor {
   }
 
   /**
-   * Buy token via Jupiter Aggregator
+   * Buy token via PumpPortal API
    */
   async buyToken(tokenMint) {
-    console.log(`\n💰 Executing JUPITER BUY for ${tokenMint.slice(0, 8)}...`);
+    console.log(`\n💰 Executing PUMPPORTAL BUY for ${tokenMint.slice(0, 8)}...`);
     
     try {
       const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
       const slippageBps = 1000; // 10% slippage (new tokens are volatile)
       
-      const result = await this.jupiterSDK.buyToken(
+      const result = await this.pumpPortalSDK.buyToken(
         tokenMint,
         config.POSITION_SIZE_SOL,
         slippageBps,
@@ -64,10 +64,10 @@ export class Executor {
   }
 
   /**
-   * Sell token via Jupiter Aggregator
+   * Sell token via PumpPortal API
    */
   async sellToken(tokenMint, tokenAmount) {
-    console.log(`\n💸 Executing JUPITER SELL for ${tokenMint.slice(0, 8)}...`);
+    console.log(`\n💸 Executing PUMPPORTAL SELL for ${tokenMint.slice(0, 8)}...`);
     
     try {
       const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
@@ -78,7 +78,7 @@ export class Executor {
         console.log(`   📊 Auto-detected balance: ${tokenAmount} tokens`);
       }
       
-      const result = await this.jupiterSDK.sellToken(
+      const result = await this.pumpPortalSDK.sellToken(
         tokenMint,
         tokenAmount,
         priorityFeeLamports
