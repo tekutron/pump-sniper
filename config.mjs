@@ -36,10 +36,12 @@ export const config = {
   
   // Safety Filters (NEW)
   ENABLE_SAFETY_FILTERS: true,           // Enable pre-buy safety checks
-  MIN_SAFETY_SCORE: 50,                  // Minimum composite safety score (0-100) [lowered from 60]
-  MIN_RUGCHECK_SCORE: 40,                // Minimum RugCheck score [lowered from 50]
-  MIN_LIQUIDITY_USD: 900,                // Minimum liquidity in USD [lowered from 1000]
+  MIN_SAFETY_SCORE: 10,                  // Minimum composite safety score (0-100) [AGGRESSIVE: lowered to 10]
+  MIN_RUGCHECK_SCORE: 10,                // Minimum RugCheck score [AGGRESSIVE: lowered to 10]
+  MIN_LIQUIDITY_USD: 500,                // Minimum liquidity in USD [lowered to 500]
   REQUIRE_SOCIALS: false,                // Require social presence (twitter/website)
+  AGE_FILTER_SECONDS: 30,                // Wait 30s after launch before buying
+  SKIP_GOPLUS: true,                     // Skip GoPlus API check (removed)
   
   // Dry-run mode (monitor only, no buys)
   DRY_RUN: process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1',

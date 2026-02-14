@@ -80,15 +80,20 @@ export class SafetyChecker {
         return results;
       }
 
-      // 3. GoPlus (honeypot + security)
-      console.log(`   3️⃣ GoPlus...`);
-      const goPlus = await this.checkGoPlus(mint);
-      results.checks.goPlus = goPlus;
-      
-      if (!goPlus.passed) {
-        results.rejectionReason = `GoPlus: ${goPlus.reason}`;
-        this.saveToCache(mint, results);
-        return results;
+      // 3. GoPlus (honeypot + security) - OPTIONAL
+      if (!this.config.SKIP_GOPLUS) {
+        console.log(`   3️⃣ GoPlus...`);
+        const goPlus = await this.checkGoPlus(mint);
+        results.checks.goPlus = goPlus;
+        
+        if (!goPlus.passed) {
+          results.rejectionReason = `GoPlus: ${goPlus.reason}`;
+          this.saveToCache(mint, results);
+          return results;
+        }
+      } else {
+        console.log(`   3️⃣ GoPlus... SKIPPED`);
+        results.checks.goPlus = { passed: true, skipped: true };
       }
 
       // 4. On-chain validation
@@ -320,25 +325,26 @@ export class SafetyChecker {
   calculateScore(checks) {
     let score = 0;
 
-    // RugCheck score (0-100)
+    // RugCheck score (0-100) - INCREASED WEIGHT
     if (checks.rugCheck?.passed && checks.rugCheck.score) {
-      score += checks.rugCheck.score * 0.4; // 40% weight
+      score += checks.rugCheck.score * 0.5; // 50% weight (was 40%)
     }
 
-    // DexScreener liquidity (normalized)
+    // DexScreener liquidity (normalized) - INCREASED WEIGHT
     if (checks.dexScreener?.passed && checks.dexScreener.liquidity) {
       const liquidityScore = Math.min(100, (checks.dexScreener.liquidity / 10000) * 100);
-      score += liquidityScore * 0.3; // 30% weight
+      score += liquidityScore * 0.4; // 40% weight (was 30%)
     }
 
-    // GoPlus security (binary)
-    if (checks.goPlus?.passed) {
-      score += 20; // 20% weight
+    // GoPlus security (binary) - REMOVED or SKIPPED
+    if (checks.goPlus?.passed && !checks.goPlus?.skipped) {
+      // If GoPlus check ran and passed, give it weight
+      score += 5; // Reduced from 20%
     }
 
     // On-chain validation (binary)
     if (checks.onChain?.passed) {
-      score += 10; // 10% weight
+      score += 5; // Reduced from 10%
     }
 
     return Math.round(score);

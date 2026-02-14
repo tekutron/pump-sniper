@@ -25,7 +25,8 @@ class PumpSniper {
       wins: 0,
       timeouts: 0,
       failed: 0,
-      safetyRejected: 0  // NEW: Track safety filter rejections
+      safetyRejected: 0,  // Track safety filter rejections
+      ageFiltered: 0      // Track age filter wait count
     };
   }
 
@@ -54,9 +55,11 @@ class PumpSniper {
     // Initialize safety checker
     if (config.ENABLE_SAFETY_FILTERS) {
       this.safetyChecker = new SafetyChecker(this.executor.connection, config);
-      console.log(`🛡️  Safety Filters: ENABLED`);
-      console.log(`   Min Score: ${config.MIN_SAFETY_SCORE}`);
+      console.log(`🛡️  Safety Filters: ENABLED (AGGRESSIVE MODE)`);
+      console.log(`   Age Filter: ${config.AGE_FILTER_SECONDS}s wait`);
+      console.log(`   Min Score: ${config.MIN_SAFETY_SCORE} (VERY LOW - RISKY!)`);
       console.log(`   Min Liquidity: $${config.MIN_LIQUIDITY_USD}`);
+      console.log(`   GoPlus Check: ${config.SKIP_GOPLUS ? 'DISABLED' : 'ENABLED'}`);
       console.log(`   Require Socials: ${config.REQUIRE_SOCIALS}\n`);
     } else {
       console.log(`⚠️  Safety Filters: DISABLED (not recommended!)\n`);
@@ -92,6 +95,7 @@ class PumpSniper {
     console.log('='.repeat(60));
     console.log(`\n📈 Session Stats:`);
     console.log(`   Total Detected: ${this.stats.detected}`);
+    console.log(`   Age Filtered: ${this.stats.ageFiltered} (waited 30s)`);
     console.log(`   Safety Rejected: ${this.stats.safetyRejected} (${((this.stats.safetyRejected / this.stats.detected * 100) || 0).toFixed(1)}%)`);
     console.log(`   Total Executed: ${this.stats.executed}`);
     console.log(`   Wins (TP hit): ${this.stats.wins}`);
@@ -146,6 +150,14 @@ class PumpSniper {
     if (this.activePositions.size >= config.MAX_CONCURRENT_SNIPES) {
       console.log(`⏸️  Skipping - already have ${this.activePositions.size} active position(s)`);
       return;
+    }
+    
+    // Age filter: Wait before sniping
+    if (config.AGE_FILTER_SECONDS > 0) {
+      this.stats.ageFiltered++;
+      console.log(`⏳ Age Filter: Waiting ${config.AGE_FILTER_SECONDS}s before checking...`);
+      await new Promise(resolve => setTimeout(resolve, config.AGE_FILTER_SECONDS * 1000));
+      console.log(`✅ Age filter passed (${config.AGE_FILTER_SECONDS}s elapsed)`);
     }
     
     // Safety check (NEW)
@@ -418,6 +430,7 @@ class PumpSniper {
     
     console.log(`\n📊 Session Stats:`);
     console.log(`   Detected: ${this.stats.detected}`);
+    console.log(`   Age Filtered: ${this.stats.ageFiltered}`);
     console.log(`   Safety Rejected: ${this.stats.safetyRejected}`);
     console.log(`   Executed: ${this.stats.executed}`);
     console.log(`   Wins (TP): ${this.stats.wins}`);
