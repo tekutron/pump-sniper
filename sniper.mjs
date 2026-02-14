@@ -47,7 +47,7 @@ class PumpSniper {
     const balance = await this.executor.getBalance();
     console.log(`💰 Wallet Balance: ${balance.toFixed(4)} SOL\n`);
     
-    if (balance < config.MIN_BALANCE_SOL) {
+    if (!config.DRY_RUN && balance < config.MIN_BALANCE_SOL) {
       throw new Error(`Insufficient balance (need ${config.MIN_BALANCE_SOL} SOL minimum)`);
     }
     
