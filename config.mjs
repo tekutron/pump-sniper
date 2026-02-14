@@ -12,7 +12,7 @@ export const config = {
   // Trading parameters
   POSITION_SIZE_SOL: 0.01,  // SMALL TEST: 0.01 SOL (change to 0.05 for full live)
   TAKE_PROFIT_PCT: 10,      // 10% profit target
-  MAX_HOLD_TIME_MS: 10000,  // 10 seconds max hold
+  MAX_HOLD_TIME_MS: 180000, // 3 minutes max hold (180 seconds)
   
   // Execution
   PRIORITY_FEE_SOL: 0.001,  // High priority for speed
