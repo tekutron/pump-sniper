@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * executor.mjs - Buy/Sell Execution
- * Fast execution with high priority fees via Pump.fun bonding curve
+ * Fast execution via Jupiter Aggregator (reliable swap routing)
  */
 
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import fs from 'node:fs';
 import config from './config.mjs';
-import { PumpFunSDK } from './pumpfun-sdk.mjs';
+import { JupiterSDK } from './jupiter-sdk.mjs';
 import { RPCManager } from './rpc-manager.mjs';
 
 export class Executor {
@@ -16,7 +16,7 @@ export class Executor {
     this.rpcManager = new RPCManager();
     this.connection = this.rpcManager.getPrimaryConnection(); // Primary for balance checks
     this.keypair = this.loadWallet();
-    this.pumpFunSDK = new PumpFunSDK(this.rpcManager, this.keypair);
+    this.jupiterSDK = new JupiterSDK(this.rpcManager, this.keypair);
   }
 
   loadWallet() {
@@ -30,16 +30,16 @@ export class Executor {
   }
 
   /**
-   * Buy token via Pump.fun bonding curve
+   * Buy token via Jupiter Aggregator
    */
   async buyToken(tokenMint) {
-    console.log(`\n💰 Executing PUMP.FUN BUY for ${tokenMint.slice(0, 8)}...`);
+    console.log(`\n💰 Executing JUPITER BUY for ${tokenMint.slice(0, 8)}...`);
     
     try {
       const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
-      const slippageBps = 1000; // 10% slippage (pump.fun tokens are volatile)
+      const slippageBps = 1000; // 10% slippage (new tokens are volatile)
       
-      const result = await this.pumpFunSDK.buyToken(
+      const result = await this.jupiterSDK.buyToken(
         tokenMint,
         config.POSITION_SIZE_SOL,
         slippageBps,
@@ -64,21 +64,21 @@ export class Executor {
   }
 
   /**
-   * Sell token via Pump.fun bonding curve
+   * Sell token via Jupiter Aggregator
    */
   async sellToken(tokenMint, tokenAmount) {
-    console.log(`\n💸 Executing PUMP.FUN SELL for ${tokenMint.slice(0, 8)}...`);
+    console.log(`\n💸 Executing JUPITER SELL for ${tokenMint.slice(0, 8)}...`);
     
     try {
       const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
       
-      // If tokenAmount is null/undefined, sell entire balance
+      // If tokenAmount is null/undefined, get actual balance
       if (!tokenAmount) {
         tokenAmount = await this.getTokenBalance(tokenMint);
         console.log(`   📊 Auto-detected balance: ${tokenAmount} tokens`);
       }
       
-      const result = await this.pumpFunSDK.sellToken(
+      const result = await this.jupiterSDK.sellToken(
         tokenMint,
         tokenAmount,
         priorityFeeLamports
@@ -102,16 +102,12 @@ export class Executor {
   }
 
   /**
-   * Get token price from Pump.fun bonding curve
+   * Get token price (placeholder - not implemented yet)
+   * Jupiter doesn't provide price API, would need DexScreener or other source
    */
   async getTokenPrice(tokenMint) {
-    try {
-      const priceData = await this.pumpFunSDK.getBondingCurvePrice(tokenMint);
-      return priceData;
-    } catch (err) {
-      console.error('Error fetching price:', err.message);
-      return null;
-    }
+    // Not implemented - bot uses timeout-based exits for now
+    return null;
   }
 
   /**
