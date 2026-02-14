@@ -5,7 +5,7 @@
  */
 
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import fs from 'node:fs';
 import config from './config.mjs';
 import PumpPortalSDK from './pumpportal-sdk.mjs';
@@ -117,10 +117,31 @@ export class Executor {
 
   /**
    * Get token balance for wallet
+   * Checks both Token Program and Token-2022 Program (pump.fun uses Token-2022)
    */
   async getTokenBalance(tokenMint) {
     try {
       const mintPubkey = new PublicKey(tokenMint);
+      
+      // Try Token-2022 first (pump.fun uses this)
+      try {
+        const ata2022 = await getAssociatedTokenAddress(
+          mintPubkey,
+          this.keypair.publicKey,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        );
+        
+        const balance2022 = await this.connection.getTokenAccountBalance(ata2022);
+        const amount = parseFloat(balance2022.value.uiAmount || 0);
+        if (amount > 0) {
+          return amount;
+        }
+      } catch (err) {
+        // Token-2022 ATA doesn't exist, try standard
+      }
+      
+      // Fallback to standard Token Program
       const ata = await getAssociatedTokenAddress(
         mintPubkey,
         this.keypair.publicKey,

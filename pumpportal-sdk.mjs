@@ -146,12 +146,35 @@ export default class PumpPortalSDK {
 
   /**
    * Get token balance
+   * Checks both Token Program and Token-2022 Program (pump.fun uses Token-2022)
    */
   async getTokenBalance(tokenMint) {
     try {
+      // Check Token-2022 first (pump.fun uses this)
+      const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
+      
+      const token2022Accounts = await this.connection.getParsedTokenAccountsByOwner(
+        this.wallet.publicKey,
+        { 
+          mint: new PublicKey(tokenMint),
+          programId: TOKEN_2022_PROGRAM_ID
+        }
+      );
+
+      if (token2022Accounts.value.length > 0) {
+        const balance = token2022Accounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+        return balance || 0;
+      }
+
+      // Fallback to standard Token Program
+      const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+      
       const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(
         this.wallet.publicKey,
-        { mint: new PublicKey(tokenMint) }
+        { 
+          mint: new PublicKey(tokenMint),
+          programId: TOKEN_PROGRAM_ID
+        }
       );
 
       if (tokenAccounts.value.length === 0) {
