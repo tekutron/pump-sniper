@@ -1,171 +1,169 @@
-#!/usr/bin/env node
 /**
- * pumpportal-sdk.mjs - PumpPortal API Integration
- * Simple pump.fun trading via PumpPortal's Lightning API
+ * pumpportal-sdk.mjs - PumpPortal Local Transaction API Integration
+ * Uses PumpPortal to build transactions, we sign and send them ourselves
  */
 
-import './load-env.mjs';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { VersionedTransaction, PublicKey } from '@solana/web3.js';
+import fetch from 'node-fetch';
 
-const PUMPPORTAL_API = 'https://pumpportal.fun/api/trade';
-const PUMPPORTAL_API_KEY = process.env.PUMPPORTAL_API_KEY || '';
-
-console.log('🎯 PumpPortal SDK initialized:', PUMPPORTAL_API_KEY ? 'API Key ✅' : 'No API Key ❌');
-
-export class PumpPortalSDK {
-  constructor(rpcManagerOrConnection, wallet) {
-    // We don't actually need these for PumpPortal API
-    // but keep interface compatible
+export default class PumpPortalSDK {
+  constructor(connection, wallet, config) {
+    this.connection = connection;
     this.wallet = wallet;
-    this.connection = rpcManagerOrConnection.getPrimaryConnection ?
-      rpcManagerOrConnection.getPrimaryConnection() :
-      rpcManagerOrConnection;
+    this.config = config;
+    this.apiUrl = 'https://pumpportal.fun/api/trade-local';
   }
 
   /**
-   * Buy tokens via PumpPortal API (pump.fun bonding curve)
+   * Buy tokens using PumpPortal
+   * @param {string} tokenMint - Token mint address
+   * @param {number} amountSol - Amount of SOL to spend
+   * @returns {Promise<string>} Transaction signature
    */
-  async buyToken(mintAddress, solAmount, slippageBps = 1000, priorityFeeLamports = 1_000_000) {
-    console.log(`\n🚀 Building PUMPPORTAL BUY...`);
-    console.log(`   Mint: ${mintAddress}`);
-    console.log(`   Amount: ${solAmount} SOL`);
-    console.log(`   Slippage: ${slippageBps / 100}%`);
+  async buy(tokenMint, amountSol) {
+    console.log(`\n📦 Building buy transaction via PumpPortal...`);
+    console.log(`   Token: ${tokenMint}`);
+    console.log(`   Amount: ${amountSol} SOL`);
 
     try {
-      const startTime = Date.now();
-      const lamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
-      const priorityFeeSol = priorityFeeLamports / LAMPORTS_PER_SOL;
-
-      console.log(`   📤 Sending to PumpPortal API...`);
-      
-      const response = await fetch(
-        `${PUMPPORTAL_API}?api-key=${PUMPPORTAL_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'buy',
-            mint: mintAddress,
-            amount: lamports,
-            denominatedInSol: 'true',
-            slippage: slippageBps / 100, // Convert bps to percent
-            priorityFee: priorityFeeSol,
-            pool: 'pump' // Use pump.fun bonding curve
-          })
-        }
-      );
-
-      const elapsed = Date.now() - startTime;
+      // Request transaction from PumpPortal
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicKey: this.wallet.publicKey.toString(),
+          action: 'buy',
+          mint: tokenMint,
+          amount: amountSol,
+          denominatedInSol: 'true',
+          slippage: this.config.SLIPPAGE_BPS / 100, // Convert BPS to percent
+          priorityFee: this.config.PRIORITY_FEE_SOL,
+          pool: 'pump' // Trade on pump.fun bonding curve
+        })
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`PumpPortal API failed (${response.status}): ${errorText}`);
+        throw new Error(`PumpPortal API error: ${response.status} ${errorText}`);
       }
 
-      const data = await response.json();
+      // Response is serialized transaction bytes
+      const txBytes = await response.arrayBuffer();
       
-      // PumpPortal returns transaction signature or error
-      if (data.error) {
-        throw new Error(`PumpPortal error: ${data.error}`);
-      }
-
-      const signature = data.signature || data;
+      // Deserialize transaction
+      const tx = VersionedTransaction.deserialize(new Uint8Array(txBytes));
       
-      console.log(`   ⚡ Transaction sent in ${elapsed}ms`);
-      console.log(`   🔗 Signature: ${signature}`);
+      // Sign transaction with our wallet
+      tx.sign([this.wallet]);
+      
+      console.log(`   ✅ Transaction built and signed`);
+      
+      // Send transaction with high priority
+      const signature = await this.connection.sendTransaction(tx, {
+        skipPreflight: this.config.SKIP_PREFLIGHT,
+        maxRetries: 3
+      });
 
-      return {
-        success: true,
-        signature,
-        mint: mintAddress,
-        amountSol: solAmount,
-        timestamp: Date.now(),
-        executionTimeMs: elapsed
-      };
+      console.log(`   📤 Transaction sent: ${signature}`);
+      
+      return signature;
 
     } catch (err) {
-      console.error(`   ❌ PumpPortal buy failed: ${err.message}`);
-      return {
-        success: false,
-        error: err.message,
-        mint: mintAddress
-      };
+      console.error(`   ❌ Buy failed:`, err.message);
+      throw err;
     }
   }
 
   /**
-   * Sell tokens via PumpPortal API
+   * Sell tokens using PumpPortal
+   * @param {string} tokenMint - Token mint address
+   * @param {number} tokenAmount - Amount of tokens to sell (or percentage if percent=true)
+   * @param {boolean} percent - If true, sell tokenAmount% of holdings
+   * @returns {Promise<string>} Transaction signature
    */
-  async sellToken(mintAddress, tokenAmount, priorityFeeLamports = 1_000_000) {
-    console.log(`\n💰 Building PUMPPORTAL SELL...`);
-    console.log(`   Mint: ${mintAddress}`);
-    console.log(`   Amount: ~${tokenAmount} tokens`);
+  async sell(tokenMint, tokenAmount, percent = false) {
+    console.log(`\n📦 Building sell transaction via PumpPortal...`);
+    console.log(`   Token: ${tokenMint}`);
+    console.log(`   Amount: ${percent ? `${tokenAmount}%` : tokenAmount}`);
 
     try {
-      const startTime = Date.now();
-      const priorityFeeSol = priorityFeeLamports / LAMPORTS_PER_SOL;
-      
-      // For sell, we need to specify token amount (not SOL)
-      const tokenAmountRaw = Math.floor(tokenAmount * 1e9); // Assume 9 decimals
+      // Get token balance if selling by percentage
+      let actualAmount = tokenAmount;
+      if (percent) {
+        const tokenBalance = await this.getTokenBalance(tokenMint);
+        actualAmount = Math.floor(tokenBalance * (tokenAmount / 100));
+        console.log(`   Token balance: ${tokenBalance}`);
+        console.log(`   Selling: ${actualAmount} tokens`);
+      }
 
-      console.log(`   📤 Sending to PumpPortal API...`);
-      
-      const response = await fetch(
-        `${PUMPPORTAL_API}?api-key=${PUMPPORTAL_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'sell',
-            mint: mintAddress,
-            amount: tokenAmountRaw,
-            denominatedInSol: 'false', // Selling tokens, not SOL
-            slippage: 10, // 10% slippage
-            priorityFee: priorityFeeSol,
-            pool: 'pump'
-          })
-        }
-      );
-
-      const elapsed = Date.now() - startTime;
+      // Request transaction from PumpPortal
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicKey: this.wallet.publicKey.toString(),
+          action: 'sell',
+          mint: tokenMint,
+          amount: actualAmount,
+          denominatedInSol: 'false', // Selling tokens, not SOL
+          slippage: this.config.SLIPPAGE_BPS / 100,
+          priorityFee: this.config.PRIORITY_FEE_SOL,
+          pool: 'pump'
+        })
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`PumpPortal API failed (${response.status}): ${errorText}`);
+        throw new Error(`PumpPortal API error: ${response.status} ${errorText}`);
       }
 
-      const data = await response.json();
+      // Response is serialized transaction bytes
+      const txBytes = await response.arrayBuffer();
       
-      if (data.error) {
-        throw new Error(`PumpPortal error: ${data.error}`);
-      }
-
-      const signature = data.signature || data;
+      // Deserialize transaction
+      const tx = VersionedTransaction.deserialize(new Uint8Array(txBytes));
       
-      console.log(`   ⚡ Transaction sent in ${elapsed}ms`);
-      console.log(`   🔗 Signature: ${signature}`);
+      // Sign transaction with our wallet
+      tx.sign([this.wallet]);
+      
+      console.log(`   ✅ Transaction built and signed`);
+      
+      // Send transaction
+      const signature = await this.connection.sendTransaction(tx, {
+        skipPreflight: this.config.SKIP_PREFLIGHT,
+        maxRetries: 3
+      });
 
-      return {
-        success: true,
-        signature,
-        mint: mintAddress,
-        timestamp: Date.now(),
-        executionTimeMs: elapsed
-      };
+      console.log(`   📤 Transaction sent: ${signature}`);
+      
+      return signature;
 
     } catch (err) {
-      console.error(`   ❌ PumpPortal sell failed: ${err.message}`);
-      return {
-        success: false,
-        error: err.message,
-        mint: mintAddress
-      };
+      console.error(`   ❌ Sell failed:`, err.message);
+      throw err;
+    }
+  }
+
+  /**
+   * Get token balance
+   */
+  async getTokenBalance(tokenMint) {
+    try {
+      const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(
+        this.wallet.publicKey,
+        { mint: new PublicKey(tokenMint) }
+      );
+
+      if (tokenAccounts.value.length === 0) {
+        return 0;
+      }
+
+      const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+      return balance || 0;
+
+    } catch (err) {
+      console.error(`Failed to get token balance:`, err.message);
+      return 0;
     }
   }
 }
-
-export default PumpPortalSDK;

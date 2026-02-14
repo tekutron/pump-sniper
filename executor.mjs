@@ -8,7 +8,7 @@ import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import fs from 'node:fs';
 import config from './config.mjs';
-import { PumpPortalSDK } from './pumpportal-sdk.mjs';
+import PumpPortalSDK from './pumpportal-sdk.mjs';
 import { RPCManager } from './rpc-manager.mjs';
 
 export class Executor {
@@ -16,7 +16,7 @@ export class Executor {
     this.rpcManager = new RPCManager();
     this.connection = this.rpcManager.getPrimaryConnection(); // Primary for balance checks
     this.keypair = this.loadWallet();
-    this.pumpPortalSDK = new PumpPortalSDK(this.rpcManager, this.keypair);
+    this.pumpPortalSDK = new PumpPortalSDK(this.connection, this.keypair, config);
   }
 
   loadWallet() {
@@ -35,23 +35,23 @@ export class Executor {
   async buyToken(tokenMint) {
     console.log(`\n💰 Executing PUMPPORTAL BUY for ${tokenMint.slice(0, 8)}...`);
     
+    const startTime = Date.now();
+    
     try {
-      const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
-      const slippageBps = 1000; // 10% slippage (new tokens are volatile)
-      
-      const result = await this.pumpPortalSDK.buyToken(
+      const signature = await this.pumpPortalSDK.buy(
         tokenMint,
-        config.POSITION_SIZE_SOL,
-        slippageBps,
-        priorityFeeLamports
+        config.POSITION_SIZE_SOL
       );
       
-      if (result.success) {
-        console.log(`✅ Buy executed in ${result.executionTimeMs}ms`);
-        console.log(`   Signature: ${result.signature}`);
-      }
+      const executionTimeMs = Date.now() - startTime;
+      console.log(`✅ Buy executed in ${executionTimeMs}ms`);
       
-      return result;
+      return {
+        success: true,
+        signature: signature,
+        executionTimeMs: executionTimeMs,
+        mint: tokenMint
+      };
       
     } catch (err) {
       console.error(`❌ Buy failed: ${err.message}`);
@@ -69,27 +69,32 @@ export class Executor {
   async sellToken(tokenMint, tokenAmount) {
     console.log(`\n💸 Executing PUMPPORTAL SELL for ${tokenMint.slice(0, 8)}...`);
     
+    const startTime = Date.now();
+    
     try {
-      const priorityFeeLamports = config.PRIORITY_FEE_SOL * LAMPORTS_PER_SOL;
+      // If tokenAmount is null/undefined, sell 100% of holdings
+      const sellPercent = !tokenAmount;
+      const amount = sellPercent ? 100 : tokenAmount;
       
-      // If tokenAmount is null/undefined, get actual balance
-      if (!tokenAmount) {
-        tokenAmount = await this.getTokenBalance(tokenMint);
-        console.log(`   📊 Auto-detected balance: ${tokenAmount} tokens`);
+      if (sellPercent) {
+        console.log(`   📊 Selling 100% of holdings`);
       }
       
-      const result = await this.pumpPortalSDK.sellToken(
+      const signature = await this.pumpPortalSDK.sell(
         tokenMint,
-        tokenAmount,
-        priorityFeeLamports
+        amount,
+        sellPercent
       );
       
-      if (result.success) {
-        console.log(`✅ Sell executed in ${result.executionTimeMs}ms`);
-        console.log(`   Signature: ${result.signature}`);
-      }
+      const executionTimeMs = Date.now() - startTime;
+      console.log(`✅ Sell executed in ${executionTimeMs}ms`);
       
-      return result;
+      return {
+        success: true,
+        signature: signature,
+        executionTimeMs: executionTimeMs,
+        mint: tokenMint
+      };
       
     } catch (err) {
       console.error(`❌ Sell failed: ${err.message}`);
