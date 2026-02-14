@@ -9,10 +9,11 @@ export const config = {
   // Pump.fun program ID (bonding curve)
   PUMP_PROGRAM_ID: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
   
-  // Trading parameters
+  // Trading parameters (QUICK SCALP - Feb 14 2026)
   POSITION_SIZE_SOL: 0.01,  // SMALL TEST: 0.01 SOL (change to 0.05 for full live)
-  TAKE_PROFIT_PCT: 10,      // 10% profit target
-  MAX_HOLD_TIME_MS: 180000, // 3 minutes max hold (180 seconds)
+  TAKE_PROFIT_PCT: 25,      // 25% profit target (quick scalp)
+  STOP_LOSS_PCT: 10,        // 10% stop loss (cut losses fast)
+  MAX_HOLD_TIME_MS: 45000,  // 45 seconds max hold (fast in/out)
   
   // Execution
   PRIORITY_FEE_SOL: 0.001,  // High priority for speed
@@ -32,15 +33,15 @@ export const config = {
   
   // Safety
   MAX_CONCURRENT_SNIPES: 1,  // One at a time for now
-  MIN_BALANCE_SOL: 0.1,      // Keep reserve
+  MIN_BALANCE_SOL: 0.05,     // Keep reserve (lowered for testing)
   
-  // Safety Filters (NEW)
+  // Safety Filters (ULTRA-AGGRESSIVE - Feb 14 2026)
   ENABLE_SAFETY_FILTERS: true,           // Enable pre-buy safety checks
-  MIN_SAFETY_SCORE: 10,                  // Minimum composite safety score (0-100) [AGGRESSIVE: lowered to 10]
-  MIN_RUGCHECK_SCORE: 10,                // Minimum RugCheck score [AGGRESSIVE: lowered to 10]
-  MIN_LIQUIDITY_USD: 500,                // Minimum liquidity in USD [lowered to 500]
-  REQUIRE_SOCIALS: false,                // Require social presence (twitter/website)
-  AGE_FILTER_SECONDS: 30,                // Wait 30s after launch before buying
+  MIN_SAFETY_SCORE: 1,                   // Minimum composite safety score (0-100) [ULTRA: accept almost anything]
+  MIN_RUGCHECK_SCORE: 1,                 // Minimum RugCheck score [ULTRA: 1/100 minimum]
+  MIN_LIQUIDITY_USD: 100,                // Minimum liquidity in USD [ULTRA-AGGRESSIVE: $100 for early entries]
+  REQUIRE_SOCIALS: true,                 // Require social presence (twitter/website) [ENABLED Feb 14]
+  AGE_FILTER_SECONDS: 20,                // Wait 20s after launch [Let pools form before trading]
   SKIP_GOPLUS: true,                     // Skip GoPlus API check (removed)
   
   // Dry-run mode (monitor only, no buys)

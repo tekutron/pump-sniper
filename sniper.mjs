@@ -40,6 +40,7 @@ class PumpSniper {
     console.log('Strategy:');
     console.log(`  Position: ${config.POSITION_SIZE_SOL} SOL`);
     console.log(`  Take Profit: +${config.TAKE_PROFIT_PCT}%`);
+    console.log(`  Stop Loss: -${config.STOP_LOSS_PCT}%`);
     console.log(`  Max Hold: ${config.MAX_HOLD_TIME_MS / 1000}s`);
     console.log(`  Priority Fee: ${config.PRIORITY_FEE_SOL} SOL\n`);
     
@@ -366,6 +367,15 @@ class PumpSniper {
         console.log(`\n🎉 TAKE PROFIT HIT! +${pnlPct.toFixed(2)}%`);
         await this.exitPosition(mint, position, 'TP', pnlPct);
         this.stats.wins++;
+        return;
+      }
+      
+      // Exit condition: Stop loss
+      if (config.STOP_LOSS_PCT && pnlPct <= -config.STOP_LOSS_PCT) {
+        clearInterval(pollInterval);
+        console.log(`\n🛑 STOP LOSS HIT! ${pnlPct.toFixed(2)}%`);
+        await this.exitPosition(mint, position, 'SL', pnlPct);
+        this.stats.failed++;
         return;
       }
       

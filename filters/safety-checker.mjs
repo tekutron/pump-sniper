@@ -58,15 +58,21 @@ export class SafetyChecker {
     };
 
     try {
-      // 1. RugCheck (most comprehensive)
+      // 1. RugCheck (optional - continue on API errors)
       console.log(`   1️⃣ RugCheck...`);
       const rugCheck = await this.checkRugCheck(mint);
       results.checks.rugCheck = rugCheck;
       
-      if (!rugCheck.passed) {
+      // Only reject on critical "danger" level risks, not API errors or low scores
+      if (!rugCheck.passed && rugCheck.reason && rugCheck.reason.startsWith('Danger:')) {
         results.rejectionReason = `RugCheck: ${rugCheck.reason}`;
         this.saveToCache(mint, results);
         return results;
+      }
+      
+      // API errors and low scores: log but continue to other checks
+      if (!rugCheck.passed) {
+        console.log(`   ⚠️ RugCheck inconclusive (${rugCheck.reason}), continuing...`);
       }
 
       // 2. DexScreener (socials + liquidity)
