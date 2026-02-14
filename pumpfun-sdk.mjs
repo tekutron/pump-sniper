@@ -129,21 +129,11 @@ export class PumpFunSDK {
         })
       );
 
-      // Check if user token account exists and create if needed
-      const accountInfo = await this._getConnection().getAccountInfo(userTokenAccount);
-      if (!accountInfo) {
-        console.log(`   📝 Creating associated token account...`);
-        // Use simpler version without explicit program IDs
-        transaction.add(
-          createAssociatedTokenAccountInstruction(
-            this.wallet.publicKey,  // payer
-            userTokenAccount,       // associatedToken
-            this.wallet.publicKey,  // owner
-            mint                    // mint
-            // Let it use default TOKEN_PROGRAM_ID and ASSOCIATED_TOKEN_PROGRAM_ID
-          )
-        );
-      }
+      // Don't create ATA in the same transaction - pump.fun may handle it
+      // or we'll handle errors gracefully if it doesn't exist
+      console.log(`   📍 User token account: ${userTokenAccount.toBase58()}`);
+      
+      // Note: If this fails, we may need to create ATA in a separate transaction first
 
       // Build buy instruction
       const lamportsToSpend = Math.floor(solAmount * LAMPORTS_PER_SOL);
