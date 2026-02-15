@@ -16,7 +16,7 @@ export const config = {
   MAX_HOLD_TIME_MS: 45000,  // 45 seconds max hold (fast in/out)
   
   // Execution
-  PRIORITY_FEE_SOL: 0.001,  // High priority for speed
+  PRIORITY_FEE_SOL: 0.0005, // Medium priority (balance speed/cost)
   SLIPPAGE_BPS: 1000,       // 10% slippage
   PRICE_POLL_MS: 1000,      // Check price every 1s (avoid rate limits!)
   
