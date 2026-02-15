@@ -12,7 +12,7 @@ export const config = {
   // Trading parameters (TP/SL ONLY - Feb 15 2026 v5)
   POSITION_SIZE_SOL: 0.01,  // SMALL TEST: 0.01 SOL (change to 0.05 for full live)
   TAKE_PROFIT_PCT: 10,      // 10% profit target (Feb 15 14:43)
-  STOP_LOSS_PCT: 5,         // 5% stop loss (TIGHT - Feb 14 22:34)
+  STOP_LOSS_PCT: 10,        // 10% stop loss (Feb 15 14:43 - 1:1 ratio)
   // MAX_HOLD_TIME removed - only TP/SL exits (no timeout)
   
   // Execution
