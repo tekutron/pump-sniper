@@ -241,7 +241,6 @@ class PumpSniper {
     this.stats.executed++;
     
     // Update position with buy signature
-    const position = this.activePositions.get(token.mint);
     position.buySig = buyResult.signature;
     
     console.log(`✅ Position opened`);
