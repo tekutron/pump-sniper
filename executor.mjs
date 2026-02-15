@@ -7,6 +7,7 @@
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import fs from 'node:fs';
+import fetch from 'node-fetch';
 import config from './config.mjs';
 import PumpPortalSDK from './pumpportal-sdk.mjs';
 import { RPCManager } from './rpc-manager.mjs';
@@ -111,8 +112,43 @@ export class Executor {
    * Jupiter doesn't provide price API, would need DexScreener or other source
    */
   async getTokenPrice(tokenMint) {
-    // Not implemented - bot uses timeout-based exits for now
-    return null;
+    try {
+      // Fetch price from DexScreener
+      const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`, {
+        timeout: 3000
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      if (!data.pairs || data.pairs.length === 0) {
+        // Token might still be on bonding curve, try PumpPortal price endpoint
+        // For now return null, will implement bonding curve price later
+        return null;
+      }
+      
+      // Get first pair (usually most liquid)
+      const pair = data.pairs[0];
+      const priceUsd = parseFloat(pair.priceUsd) || 0;
+      
+      if (priceUsd > 0) {
+        return {
+          price: priceUsd,
+          timestamp: Date.now(),
+          source: 'dexscreener',
+          liquidity: pair.liquidity?.usd || 0
+        };
+      }
+      
+      return null;
+      
+    } catch (err) {
+      console.error(`   ⚠️ Price fetch error: ${err.message}`);
+      return null;
+    }
   }
 
   /**

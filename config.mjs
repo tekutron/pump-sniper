@@ -9,11 +9,11 @@ export const config = {
   // Pump.fun program ID (bonding curve)
   PUMP_PROGRAM_ID: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
   
-  // Trading parameters (FAST SCALP - Feb 14 2026 v2)
+  // Trading parameters (TP/SL ONLY - Feb 14 2026 v3)
   POSITION_SIZE_SOL: 0.01,  // SMALL TEST: 0.01 SOL (change to 0.05 for full live)
-  TAKE_PROFIT_PCT: 15,      // 15% profit target (faster exits)
-  STOP_LOSS_PCT: 10,        // 10% stop loss (cut losses fast)
-  MAX_HOLD_TIME_MS: 45000,  // 45 seconds max hold (fast in/out)
+  TAKE_PROFIT_PCT: 15,      // 15% profit target
+  STOP_LOSS_PCT: 10,        // 10% stop loss
+  // MAX_HOLD_TIME removed - only TP/SL exits (no timeout)
   
   // Execution
   PRIORITY_FEE_SOL: 0.0005, // Medium priority (balance speed/cost)

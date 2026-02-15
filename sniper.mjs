@@ -330,36 +330,27 @@ class PumpSniper {
         priceData = await this.executor.getTokenPrice(mint);
       }
       
-      // ALWAYS check timeout first (even if price data fails!)
-      if (elapsed >= config.MAX_HOLD_TIME_MS) {
-        clearInterval(pollInterval);
-        console.log(`\n⏱️  TIME LIMIT REACHED (${config.MAX_HOLD_TIME_MS/1000}s)`);
-        await this.exitPosition(mint, position, 'TIME', 0);
-        this.stats.timeouts++;
-        return;
-      }
-      
-      if (!priceData) {
-        // No price data available - this is expected since we haven't implemented
-        // bonding curve parsing yet. Just show elapsed time and wait for timeout.
-        if (elapsed % 5000 < config.PRICE_POLL_MS) { // Log every 5 seconds
-          console.log(`   [${(elapsed/1000).toFixed(1)}s] ⏳ Waiting for timeout (no price data yet)...`);
+      if (!priceData || !priceData.price) {
+        // No price data yet - keep waiting
+        if (elapsed % 10000 < config.PRICE_POLL_MS) { // Log every 10 seconds
+          console.log(`   [${(elapsed/1000).toFixed(1)}s] ⏳ Waiting for price data...`);
         }
         return; // Skip this iteration but keep monitoring
       }
       
       const currentPrice = priceData.price;
+      const priceSource = priceData.source || 'unknown';
       
       // Set entry price on first successful check
       if (!entryPrice) {
         entryPrice = currentPrice;
         position.entryPrice = entryPrice;
-        console.log(`   Entry price: $${entryPrice.toFixed(8)}`);
+        console.log(`   Entry price: $${entryPrice.toFixed(8)} (${priceSource})`);
       }
       
       const pnlPct = ((currentPrice - entryPrice) / entryPrice) * 100;
       
-      console.log(`   [${(elapsed/1000).toFixed(1)}s] Price: $${currentPrice.toFixed(8)} | P&L: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%`);
+      console.log(`   [${(elapsed/1000).toFixed(1)}s] $${currentPrice.toFixed(8)} | P&L: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%`);
       
       // Exit condition: Take profit
       if (pnlPct >= config.TAKE_PROFIT_PCT) {
