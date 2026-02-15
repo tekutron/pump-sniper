@@ -166,10 +166,10 @@ export class Executor {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-KEY': '9c90d9c9-7876-4ada-ab09-8a9b3385cdd6'
+          'Authorization': 'Bearer ory_at_nAJm-B0EwylN7MTpOTVeBJqWYUDRpUY69xQJF2Riacw.xwrVe-F3ztclY3ZcrXzbLcje8dpjEDgZpAtGhQ4htm8'
         },
         body: JSON.stringify({ query }),
-        timeout: 3000
+        timeout: 5000
       });
       
       if (!response.ok) {
@@ -196,6 +196,7 @@ export class Executor {
       
     } catch (err) {
       // Silently fail, will try DexScreener
+      console.error(`   ⚠️ Bitquery error: ${err.message}`);
       return null;
     }
   }
