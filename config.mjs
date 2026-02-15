@@ -35,14 +35,15 @@ export const config = {
   MAX_CONCURRENT_SNIPES: 1,  // One at a time for now
   MIN_BALANCE_SOL: 0.05,     // Keep reserve (lowered for testing)
   
-  // Safety Filters (ULTRA-AGGRESSIVE - Feb 14 2026)
+  // Safety Filters (BONDING CURVE MODE - Feb 14 2026)
   ENABLE_SAFETY_FILTERS: true,           // Enable pre-buy safety checks
   MIN_SAFETY_SCORE: 1,                   // Minimum composite safety score (0-100) [ULTRA: accept almost anything]
   MIN_RUGCHECK_SCORE: 1,                 // Minimum RugCheck score [ULTRA: 1/100 minimum]
-  MIN_LIQUIDITY_USD: 100,                // Minimum liquidity in USD [ULTRA-AGGRESSIVE: $100 for early entries]
+  MIN_LIQUIDITY_USD: 100,                // Minimum liquidity in USD [Only for GRADUATED tokens]
   REQUIRE_SOCIALS: true,                 // Require social presence (twitter/website) [ENABLED Feb 14]
   AGE_FILTER_SECONDS: 20,                // Wait 20s after launch [Let pools form before trading]
   SKIP_GOPLUS: true,                     // Skip GoPlus API check (removed)
+  // NOTE: Bonding curve tokens skip DEX liquidity checks - they trade directly on pump.fun
   
   // Dry-run mode (monitor only, no buys)
   DRY_RUN: process.env.DRY_RUN === 'true' || process.env.DRY_RUN === '1',
