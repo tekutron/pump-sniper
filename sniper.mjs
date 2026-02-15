@@ -153,6 +153,18 @@ class PumpSniper {
       return;
     }
     
+    // Reserve position slot IMMEDIATELY to prevent race conditions
+    const placeholderPosition = {
+      mint: token.mint,
+      entryTime: Date.now(),
+      entryPrice: null,
+      buySig: null,
+      amountSol: config.POSITION_SIZE_SOL,
+      tokenAmount: null,
+      reserved: true // Mark as reserved during checks
+    };
+    this.activePositions.set(token.mint, placeholderPosition);
+    
     // Age filter: Wait before sniping
     if (config.AGE_FILTER_SECONDS > 0) {
       this.stats.ageFiltered++;
@@ -169,6 +181,9 @@ class PumpSniper {
         this.stats.safetyRejected++;
         console.log(`🛡️  SAFETY REJECTED: ${safetyResult.rejectionReason}`);
         console.log(`   Score: ${safetyResult.score}`);
+        
+        // Remove placeholder - safety check failed
+        this.activePositions.delete(token.mint);
         
         // Log rejection to trades file for analysis
         this.recordTrade(token, null, null, 'SAFETY_REJECTED', 0, 0, safetyResult);
@@ -187,16 +202,12 @@ class PumpSniper {
     
     console.log(`\n💎 ${config.DRY_RUN ? 'SIMULATING' : 'SNIPING'} ${token.mint.slice(0, 8)}...`);
     
-    // Reserve the position slot IMMEDIATELY to prevent race conditions
-    const placeholderPosition = {
-      mint: token.mint,
-      entryTime: Date.now(),
-      entryPrice: null,
-      buySig: null,
-      amountSol: config.POSITION_SIZE_SOL,
-      tokenAmount: null
-    };
-    this.activePositions.set(token.mint, placeholderPosition);
+    // Position already reserved in onNewToken() - update with actual entry time
+    const position = this.activePositions.get(token.mint);
+    if (position) {
+      position.entryTime = Date.now();
+      position.reserved = false; // Mark as active trade
+    }
     
     let buyResult;
     
