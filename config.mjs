@@ -9,15 +9,15 @@ export const config = {
   // Pump.fun program ID (bonding curve)
   PUMP_PROGRAM_ID: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
   
-  // Trading parameters (TP/SL ONLY - Feb 14 2026 v4)
+  // Trading parameters (TP/SL ONLY - Feb 15 2026 v5)
   POSITION_SIZE_SOL: 0.01,  // SMALL TEST: 0.01 SOL (change to 0.05 for full live)
-  TAKE_PROFIT_PCT: 15,      // 15% profit target
+  TAKE_PROFIT_PCT: 10,      // 10% profit target (Feb 15 14:43)
   STOP_LOSS_PCT: 5,         // 5% stop loss (TIGHT - Feb 14 22:34)
   // MAX_HOLD_TIME removed - only TP/SL exits (no timeout)
   
   // Execution
   PRIORITY_FEE_SOL: 0.0005, // Medium priority (balance speed/cost)
-  SLIPPAGE_BPS: 1000,       // 10% slippage
+  SLIPPAGE_BPS: 500,        // 5% slippage (Feb 15 14:43)
   PRICE_POLL_MS: 1000,      // Check price every 1s (avoid rate limits!)
   
   // RPC (load from .env)
