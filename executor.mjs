@@ -113,7 +113,95 @@ export class Executor {
    */
   async getTokenPrice(tokenMint) {
     try {
-      // Fetch price from DexScreener
+      // Try Bitquery first (works for bonding curve + graduated)
+      const bitqueryPrice = await this.getBitqueryPrice(tokenMint);
+      if (bitqueryPrice) {
+        return bitqueryPrice;
+      }
+      
+      // Fallback to DexScreener (graduated tokens only)
+      const dexscreenerPrice = await this.getDexScreenerPrice(tokenMint);
+      if (dexscreenerPrice) {
+        return dexscreenerPrice;
+      }
+      
+      return null;
+      
+    } catch (err) {
+      console.error(`   ⚠️ Price fetch error: ${err.message}`);
+      return null;
+    }
+  }
+  
+  async getBitqueryPrice(tokenMint) {
+    try {
+      const query = `
+      {
+        Trading {
+          Pairs(
+            where: {
+              Token: { Address: { is: "${tokenMint}" } }
+              Price: { IsQuotedInUsd: true }
+              Market: {
+                Network: { is: "Solana" }
+                Program: { is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" }
+              }
+            }
+            limit: { count: 1 }
+            orderBy: { descending: Block_Time }
+          ) {
+            Price {
+              Ohlc {
+                Close
+              }
+            }
+            Volume {
+              Usd
+            }
+          }
+        }
+      }`;
+      
+      const response = await fetch('https://streaming.bitquery.io/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': '9c90d9c9-7876-4ada-ab09-8a9b3385cdd6'
+        },
+        body: JSON.stringify({ query }),
+        timeout: 3000
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const result = await response.json();
+      
+      if (result.data?.Trading?.Pairs?.length > 0) {
+        const pair = result.data.Trading.Pairs[0];
+        const price = pair.Price?.Ohlc?.Close;
+        
+        if (price && price > 0) {
+          return {
+            price: price,
+            timestamp: Date.now(),
+            source: 'bitquery',
+            volume: pair.Volume?.Usd || 0
+          };
+        }
+      }
+      
+      return null;
+      
+    } catch (err) {
+      // Silently fail, will try DexScreener
+      return null;
+    }
+  }
+  
+  async getDexScreenerPrice(tokenMint) {
+    try {
       const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`, {
         timeout: 3000
       });
@@ -125,12 +213,9 @@ export class Executor {
       const data = await response.json();
       
       if (!data.pairs || data.pairs.length === 0) {
-        // Token might still be on bonding curve, try PumpPortal price endpoint
-        // For now return null, will implement bonding curve price later
         return null;
       }
       
-      // Get first pair (usually most liquid)
       const pair = data.pairs[0];
       const priceUsd = parseFloat(pair.priceUsd) || 0;
       
@@ -146,7 +231,6 @@ export class Executor {
       return null;
       
     } catch (err) {
-      console.error(`   ⚠️ Price fetch error: ${err.message}`);
       return null;
     }
   }
