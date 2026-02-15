@@ -24,6 +24,9 @@ export const config = {
   RPC_URL: process.env.HELIUS_RPC_URL || process.env.SOLANA_RPC || 'https://api.mainnet-beta.solana.com',
   RPC_WS_URL: (process.env.HELIUS_RPC_URL || process.env.SOLANA_RPC || '')?.replace('https://', 'wss://').replace('http://', 'ws://') || null,
   
+  // Price APIs
+  MORALIS_API_KEY: process.env.MORALIS_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjU4MTZlYzJmLTM4ZWItNDRkMy1hMWExLWI5NTZjZTMyYzhkMyIsIm9yZ0lkIjoiNTAwNzk1IiwidXNlcklkIjoiNTE1Mjk0IiwidHlwZUlkIjoiYzYyZTU4MTctMDIzZi00Y2I2LWEzNjQtNjk4NzE3MTg0Yzc5IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzExOTQ3MDYsImV4cCI6NDkyNjk1NDcwNn0.Mpak3-USUBjZ4Rep1yhuEyNyzLh3Zzjc4ASirLEhVME',
+  
   // Wallet (dedicated pump-sniper wallet)
   WALLET_PATH: './wallets/pump_sniper_wallet.json',
   

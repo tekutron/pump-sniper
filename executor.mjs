@@ -108,18 +108,23 @@ export class Executor {
   }
 
   /**
-   * Get token price (placeholder - not implemented yet)
-   * Jupiter doesn't provide price API, would need DexScreener or other source
+   * Get token price from multiple sources (priority: Moralis → Bitquery → DexScreener)
    */
   async getTokenPrice(tokenMint) {
     try {
-      // Try Bitquery first (works for bonding curve + graduated)
+      // Try Moralis first (fast, reliable, supports bonding curve + graduated)
+      const moralisPrice = await this.getMoralisPrice(tokenMint);
+      if (moralisPrice) {
+        return moralisPrice;
+      }
+      
+      // Fallback to Bitquery (works for bonding curve + graduated)
       const bitqueryPrice = await this.getBitqueryPrice(tokenMint);
       if (bitqueryPrice) {
         return bitqueryPrice;
       }
       
-      // Fallback to DexScreener (graduated tokens only)
+      // Final fallback to DexScreener (graduated tokens only)
       const dexscreenerPrice = await this.getDexScreenerPrice(tokenMint);
       if (dexscreenerPrice) {
         return dexscreenerPrice;
@@ -129,6 +134,48 @@ export class Executor {
       
     } catch (err) {
       console.error(`   ⚠️ Price fetch error: ${err.message}`);
+      return null;
+    }
+  }
+  
+  async getMoralisPrice(tokenMint) {
+    try {
+      const MORALIS_API_KEY = config.MORALIS_API_KEY || 
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjU4MTZlYzJmLTM4ZWItNDRkMy1hMWExLWI5NTZjZTMyYzhkMyIsIm9yZ0lkIjoiNTAwNzk1IiwidXNlcklkIjoiNTE1Mjk0IiwidHlwZUlkIjoiYzYyZTU4MTctMDIzZi00Y2I2LWEzNjQtNjk4NzE3MTg0Yzc5IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzExOTQ3MDYsImV4cCI6NDkyNjk1NDcwNn0.Mpak3-USUBjZ4Rep1yhuEyNyzLh3Zzjc4ASirLEhVME';
+      
+      // Moralis Solana token price API
+      const response = await fetch(
+        `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/price`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-API-Key': MORALIS_API_KEY
+          },
+          timeout: 3000
+        }
+      );
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      // Moralis returns price in USD
+      if (data.usdPrice && data.usdPrice > 0) {
+        return {
+          price: data.usdPrice,
+          timestamp: Date.now(),
+          source: 'moralis',
+          liquidity: data.liquidity || 0
+        };
+      }
+      
+      return null;
+      
+    } catch (err) {
+      // Silently fail, will try next source
       return null;
     }
   }
