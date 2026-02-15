@@ -41,7 +41,7 @@ export const config = {
   MIN_RUGCHECK_SCORE: 1,                 // Minimum RugCheck score [ULTRA: 1/100 minimum]
   MIN_LIQUIDITY_USD: 100,                // Minimum liquidity in USD [Only for GRADUATED tokens]
   REQUIRE_SOCIALS: true,                 // Require social presence (twitter/website) [ENABLED Feb 14]
-  AGE_FILTER_SECONDS: 5,                 // Wait 5s after launch [Fast entry, catch early pumps]
+  AGE_FILTER_SECONDS: 20,                // Wait 20s after launch [Optimal for bonding curve detection]
   SKIP_GOPLUS: true,                     // Skip GoPlus API check (removed)
   // NOTE: Bonding curve tokens skip DEX liquidity checks - they trade directly on pump.fun
   
