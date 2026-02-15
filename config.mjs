@@ -9,9 +9,9 @@ export const config = {
   // Pump.fun program ID (bonding curve)
   PUMP_PROGRAM_ID: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
   
-  // Trading parameters (QUICK SCALP - Feb 14 2026)
+  // Trading parameters (FAST SCALP - Feb 14 2026 v2)
   POSITION_SIZE_SOL: 0.01,  // SMALL TEST: 0.01 SOL (change to 0.05 for full live)
-  TAKE_PROFIT_PCT: 25,      // 25% profit target (quick scalp)
+  TAKE_PROFIT_PCT: 15,      // 15% profit target (faster exits)
   STOP_LOSS_PCT: 10,        // 10% stop loss (cut losses fast)
   MAX_HOLD_TIME_MS: 45000,  // 45 seconds max hold (fast in/out)
   
@@ -41,7 +41,7 @@ export const config = {
   MIN_RUGCHECK_SCORE: 1,                 // Minimum RugCheck score [ULTRA: 1/100 minimum]
   MIN_LIQUIDITY_USD: 100,                // Minimum liquidity in USD [Only for GRADUATED tokens]
   REQUIRE_SOCIALS: true,                 // Require social presence (twitter/website) [ENABLED Feb 14]
-  AGE_FILTER_SECONDS: 20,                // Wait 20s after launch [Let pools form before trading]
+  AGE_FILTER_SECONDS: 5,                 // Wait 5s after launch [Fast entry, catch early pumps]
   SKIP_GOPLUS: true,                     // Skip GoPlus API check (removed)
   // NOTE: Bonding curve tokens skip DEX liquidity checks - they trade directly on pump.fun
   
